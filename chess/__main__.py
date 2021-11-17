@@ -40,7 +40,7 @@ def display_moves(moves: list[Square]):
 print('Inputting default board layout...')
 board = Board.default()
 display_board(board)
-print(bin(board.castle_state), board.en_passant_state)
+print(bin(board.castle_state.id), board.en_passant_state)
 print(board.fen)
 
 # new_fen = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2'

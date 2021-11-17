@@ -37,7 +37,10 @@ class Piece:
             raise errors.ChessError('Invalid type provided.')
 
     @classmethod
-    def from_fen(cls, fen: str, color: int):
+    def from_fen(cls, fen: str, color: int = None):
+        if not color:
+            color = PieceColor.WHITE if fen.isupper() else PieceColor.BLACK
+
         for Piece in PIECES:
             if Piece.FEN == fen:
                 return Piece(color=color)
@@ -45,6 +48,9 @@ class Piece:
 
     def __int__(self):
         return self.id
+
+    def __repr__(self) -> str:
+        return f'<Piece fen="{self.fen}">'
 
     @property
     def color(self) -> int:
@@ -69,9 +75,6 @@ class Piece:
     def moves(self, board, square):
         """Returns a generator that iterates through this piece's possible moves."""
         raise NotImplementedError
-
-    def __repr__(self) -> str:
-        return ''
 
 
 def search_along_direction(board, square, direction, *, max_iterations=0):
@@ -135,6 +138,9 @@ class Pawn(Piece):
         )
 
         for square_to_check in squares_to_check:
+            if not square_to_check.is_valid():
+                continue
+
             piece_to_check = board.get(square_to_check)
             if piece_to_check:
                 if piece.color != piece_to_check.color:

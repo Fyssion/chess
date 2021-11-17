@@ -37,4 +37,4 @@ class Square:
         )
 
     def __repr__(self):
-        return f'<Position file="{self.file}", rank="{self.rank}"'
+        return f'<Square file="{self.file}", rank="{self.rank}">'
