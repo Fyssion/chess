@@ -10,8 +10,8 @@ class Square:
         self.column = column
 
     @classmethod
-    def from_notation(cls, notation: str):
-        file, rank = list(notation)
+    def from_san(cls, san: str):
+        file, rank = list(san)
         return cls(int(rank) - 1, cls.FILES.index(file))
 
     @property
@@ -23,7 +23,7 @@ class Square:
         return self.FILES[self.column]
 
     @property
-    def notation(self) -> str:
+    def san(self) -> str:
         return f'{self.file}{self.rank}'
 
     def is_valid(self) -> bool:

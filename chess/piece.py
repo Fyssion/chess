@@ -36,21 +36,24 @@ class Piece:
         if self.TYPE and self.type != self.TYPE:
             raise errors.ChessError('Invalid type provided.')
 
-    @classmethod
-    def from_fen(cls, fen: str, color: int = None):
-        if not color:
-            color = PieceColor.WHITE if fen.isupper() else PieceColor.BLACK
-
-        for Piece in PIECES:
-            if Piece.FEN == fen:
-                return Piece(color=color)
-        raise errors.InvalidFEN()
+    def __eq__(self, other) -> bool:
+        return isinstance(other, self.__class__) and self.id == other.id
 
     def __int__(self):
         return self.id
 
     def __repr__(self) -> str:
         return f'<Piece fen="{self.fen}">'
+
+    @classmethod
+    def from_fen(cls, fen: str, color: int = None):
+        if not color:
+            color = PieceColor.WHITE if fen.isupper() else PieceColor.BLACK
+
+        for Piece in PIECES:
+            if Piece.FEN == fen.lower():
+                return Piece(color=color)
+        raise errors.InvalidFEN()
 
     @property
     def color(self) -> int:

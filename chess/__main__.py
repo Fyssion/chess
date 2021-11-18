@@ -48,7 +48,7 @@ print(board.fen)
 # new_board = Board.from_fen(new_fen)
 # display_board(new_board)
 # assert new_board.en_passant_state
-# print(bin(new_board.castle_state), new_board.en_passant_state.notation)
+# print(bin(new_board.castle_state), new_board.en_passant_state.san)
 # print(new_board.fen)
 
 new_fen = '8/3R4/8/3q4/8/8/3r4/8 w KQkq - 0 1'

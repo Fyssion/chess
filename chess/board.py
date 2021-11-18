@@ -2,7 +2,7 @@ from platform import version
 from typing import Optional
 
 from . import errors
-from .move import Move
+from .move import Move, CastleMove, CastleType
 from .piece import PieceColor, Piece, PIECES, PieceType
 from .square import Square
 
@@ -58,6 +58,7 @@ class Board:
         'en_passant_state',
         'fullmoves',
         'halfmoves',
+        'move_history'
     )
 
     DEFAULT_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
@@ -68,6 +69,7 @@ class Board:
     en_passant_state: Optional[Square]
     fullmoves: int
     halfmoves: int
+    move_history: list[Move]
 
     def __init__(self):
         # 8x8 board filled with nothing
@@ -81,6 +83,7 @@ class Board:
         self.en_passant_state = None
         self.fullmoves = 1
         self.halfmoves = 0
+        self.move_history = []
 
     @classmethod
     def default(cls):
@@ -137,7 +140,7 @@ class Board:
 
         # en passant state
         if en_passant_state != '-':
-            self.en_passant_state = Square.from_notation(en_passant_state)
+            self.en_passant_state = Square.from_san(en_passant_state)
 
         # set halfmoves and fullmoves
         try:
@@ -195,7 +198,7 @@ class Board:
 
         # en passant state
         if self.en_passant_state:
-            result += self.en_passant_state.notation
+            result += self.en_passant_state.san
         else:
             result += '-'
 
@@ -223,25 +226,46 @@ class Board:
                 for move in piece.moves(self, square):
                     yield Move(square, move)
 
-    def parse_san(self, san: str):
+    def make_move(self, move: Move):
+        piece = self.rows[move.from_square.row][move.from_square.column]
+        self.rows[move.from_square.row][move.from_square.column] = None
+        self.rows[move.to_square.row][move.to_square.column] = piece
+
+        self.move_history.append(move)
+
+        if self.active_color is PieceColor.BLACK:
+            self.fullmoves += 1
+
+        self.active_color = PieceColor.BLACK if self.active_color else PieceColor.WHITE
+
+    def unmake_move(self, move: Move):
+        piece = self.rows[move.to_square.row][move.to_square.column]
+        self.rows[move.to_square.row][move.to_square.column] = None
+        self.rows[move.from_square.row][move.from_square.column] = piece
+
+        if self.move_history[-1] == move:
+            self.move_history.pop(-1)
+
+        if self.active_color is PieceColor.WHITE:
+            self.fullmoves -= 1
+
+        self.active_color = PieceColor.BLACK if self.active_color else PieceColor.WHITE
+
+    def parse_san(self, san: str) -> Move:
         piece: Optional[Piece] = None
         from_row: Optional[int] = None
         from_column: Optional[int] = None
         to_square: Optional[Square] = None
 
         if san in ('0-0', 'O-O'):
-            # kingside casting, will deal with later
-            return
+            return CastleMove(CastleType.KINGSIDE)
 
         if san in ('0-0-0', 'O-O-O'):
-            # queenside castling, will deal with later
-            return
+            return CastleMove(CastleType.QUEENSIDE)
 
         for i, char in enumerate(san):
             # see if a piece if specified
             possible_fens = [Piece.FEN.upper() for Piece in PIECES]
-
-            print(i, char)
 
             if char in possible_fens:
                 piece = Piece.from_fen(char)
@@ -252,7 +276,6 @@ class Board:
                 if 1 <= len(char) - i <= 2:
                     # we are at the final square's file
                     to_square = Square(int(san[i + 1]) - 1, Square.FILES.index(char))
-                    print(to_square, int(san[i + 1]) - 1, Square.FILES.index(char), Square.FILES[Square.FILES.index(char)])
                     break
                 else:
                     # we are at the first square's file
@@ -277,8 +300,6 @@ class Board:
         legal_moves = list(self.legal_moves())
         possible_moves: list[Move] = []
 
-        print(to_square, from_row, from_column, piece)
-
         for legal_move in legal_moves:
             if (
                 to_square == legal_move.to_square
@@ -297,8 +318,10 @@ class Board:
 
         return possible_moves[0]
 
-    def push_move(self, san: str):
+    def push_san(self, san: str):
         move = self.parse_san(san)
+        self.make_move(move)
+        return move
 
     def __repr__(self) -> str:
         return f'<Board fen={self.fen}>'

@@ -65,9 +65,15 @@ def main():
                 console.print('Goodbye!', style='bold blue')
                 return
 
-        console.print(move)
+        if move.lower() in ('u', 'undo'):
+            if not board.move_history:
+                console.print('[prompt.invalid]No move to undo.')
+            else:
+                board.unmake_move(board.move_history[-1])
+            continue
+
         try:
-            result = board.parse_san(move)
+            result = board.push_san(move)
         except InvalidFEN:
             console.print('[prompt.invalid]Please enter a valid move.')
         except DisambiguationError as e:
