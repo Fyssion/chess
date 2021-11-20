@@ -214,7 +214,42 @@ class Board:
     def get(self, square: Square):
         return self.rows[square.row][square.column]
 
-    def legal_moves(self):
+    def is_in_check(self, color: int = None) -> bool:
+        if color is None:
+            color = self.active_color
+
+        for i, row in enumerate(self.rows):
+            for j, piece in enumerate(row):
+                if piece is None:
+                    continue
+                if piece.color == color:
+                    continue
+
+                square = Square(i, j)
+                for move in piece.moves(self, square):
+                    capture = self.get(move)
+
+                    if capture and capture.type == PieceType.KING:
+                        return True
+
+        return False
+
+    def is_checkmate(self) -> bool:
+        if self.is_in_check() and not list(self.legal_moves()):
+            return True
+
+        return False
+
+    def is_stalemate(self) -> bool:
+        if self.halfmoves >= 100:
+            return True
+
+        if not self.is_in_check and not list(self.legal_moves()):
+            return True
+
+        return False
+
+    def pseudo_legal_moves(self):
         for i, row in enumerate(self.rows):
             for j, piece in enumerate(row):
                 if not piece:
@@ -224,7 +259,28 @@ class Board:
 
                 square = Square(i, j)
                 for move in piece.moves(self, square):
-                    yield Move(square, move)
+                    capture = self.get(move)
+                    yield Move(square, move, capture=capture)
+
+    def legal_moves(self):
+        is_in_check = self.is_in_check()
+        active_color = self.active_color
+
+        for move in self.pseudo_legal_moves():
+            if not is_in_check:
+                yield move
+                continue
+
+            valid: Optional[bool] = False
+
+            # make the move, see if still in check, unmake the move
+            self.make_move(move)
+            if not self.is_in_check(active_color):
+                valid = True
+            self.unmake_move(move)
+
+            if valid:
+                yield move
 
     def make_move(self, move: Move):
         piece = self.rows[move.from_square.row][move.from_square.column]
@@ -240,7 +296,7 @@ class Board:
 
     def unmake_move(self, move: Move):
         piece = self.rows[move.to_square.row][move.to_square.column]
-        self.rows[move.to_square.row][move.to_square.column] = None
+        self.rows[move.to_square.row][move.to_square.column] = move.capture
         self.rows[move.from_square.row][move.from_square.column] = piece
 
         if self.move_history[-1] == move:
@@ -268,12 +324,12 @@ class Board:
             possible_fens = [Piece.FEN.upper() for Piece in PIECES]
 
             if char in possible_fens:
-                piece = Piece.from_fen(char)
+                piece = Piece.from_fen(char, color=self.active_color)
                 continue
 
             if char in Square.FILES:
                 # we are either at the final square's file or the first square's file
-                if 1 <= len(char) - i <= 2:
+                if 1 <= len(char) - i + 1 <= 2:
                     # we are at the final square's file
                     to_square = Square(int(san[i + 1]) - 1, Square.FILES.index(char))
                     break
@@ -307,7 +363,6 @@ class Board:
                 and (from_column is None or from_column == legal_move.from_square.column)
                 and (from_row is None or from_row == legal_move.from_square.row)
             ):
-                # TODO: uhh actually make the move
                 possible_moves.append(legal_move)
 
         if not possible_moves:

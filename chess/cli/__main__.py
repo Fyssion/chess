@@ -5,7 +5,7 @@ from rich.markdown import Markdown
 from rich.prompt import Prompt, Confirm, PromptBase, InvalidResponse
 
 import chess
-from chess.errors import InvalidFEN, DisambiguationError
+from chess.errors import InvalidMove, DisambiguationError
 from chess.piece import PieceColor
 
 from .board import Board
@@ -55,6 +55,16 @@ def main():
 
     while True:
         console.print(board.render())
+
+        if board.is_checkmate():
+            color = 'White' if board.active_color == PieceColor.BLACK else 'Black'
+            console.print(f'[bold magenta]Checkmate![/] {color} wins.')
+            break
+
+        if board.is_stalemate():
+            console.print('Stalemate!')
+            break
+
         move = Prompt.ask('Please enter a move in algebraic notation')
 
         if not move:
@@ -74,7 +84,7 @@ def main():
 
         try:
             result = board.push_san(move)
-        except InvalidFEN:
+        except InvalidMove:
             console.print('[prompt.invalid]Please enter a valid move.')
         except DisambiguationError as e:
             move = Prompt.ask(

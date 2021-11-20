@@ -37,17 +37,18 @@ class Piece:
             raise errors.ChessError('Invalid type provided.')
 
     def __eq__(self, other) -> bool:
-        return isinstance(other, self.__class__) and self.id == other.id
+        return isinstance(other, Piece) and self.id == other.id
 
     def __int__(self):
         return self.id
 
     def __repr__(self) -> str:
-        return f'<Piece fen="{self.fen}">'
+        color = 'White' if self.color == PieceColor.WHITE else 'Black'
+        return f'<Piece fen="{self.fen}" color="{color}">'
 
     @classmethod
     def from_fen(cls, fen: str, color: int = None):
-        if not color:
+        if color is None:
             color = PieceColor.WHITE if fen.isupper() else PieceColor.BLACK
 
         for Piece in PIECES:
@@ -80,7 +81,7 @@ class Piece:
         raise NotImplementedError
 
 
-def search_along_direction(board, square, direction, *, max_iterations=0):
+def search_along_direction(board, square, direction, *, max_iterations=0, can_capture=True):
     piece = board.get(square)
     negative = -1 if piece.color is PieceColor.BLACK else 1
     current_square = square
@@ -100,7 +101,7 @@ def search_along_direction(board, square, direction, *, max_iterations=0):
 
         if current_piece:
             # stop if a piece is hit
-            if piece.color == current_piece.color:
+            if piece.color == current_piece.color or not can_capture:
                 break
             else:
                 yield current_square
@@ -130,7 +131,7 @@ class Pawn(Piece):
         piece = board.get(square)
         max_iterations = 2 if self.is_first_move(square, piece.color) else 1
 
-        for move in search_along_direction(board, square, direction=(0, 1), max_iterations=max_iterations):
+        for move in search_along_direction(board, square, direction=(0, 1), max_iterations=max_iterations, can_capture=False):
             yield move
 
         # also check diagonal squares
