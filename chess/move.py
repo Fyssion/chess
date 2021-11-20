@@ -10,6 +10,8 @@ class CastleType:
 
 
 class Move:
+    """A move being made on the board."""
+
     __slots__ = ('from_square', 'to_square', 'capture', 'castle')
 
     from_square: Square

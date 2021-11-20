@@ -25,6 +25,8 @@ class PieceType:
 
 
 class Piece:
+    """A piece on the board."""
+
     __slots__ = ('id')
 
     TYPE: int
@@ -58,15 +60,21 @@ class Piece:
 
     @property
     def color(self) -> int:
+        """Returns the color of the piece."""
+
         return self.id & 0b1000
 
     @property
     def type(self) -> int:
+        """Returns the type of the piece."""
+
         mask = (1 << 3) - 1
         return (self.id & mask)
 
     @property
     def fen(self) -> str:
+        """Returns the piece's FEN string."""
+
         if self.FEN:
             return self.FEN
 
@@ -77,11 +85,14 @@ class Piece:
         raise RuntimeError('Invalid PieceType.')
 
     def moves(self, board, square):
-        """Returns a generator that iterates through this piece's possible moves."""
+        """Returns a generator of the piece's possible moves."""
+
         raise NotImplementedError
 
 
 def search_along_direction(board, square, direction, *, max_iterations=0, can_capture=True):
+    """Returns a generator of the ray of moves along a direction."""
+
     piece = board.get(square)
     negative = -1 if piece.color is PieceColor.BLACK else 1
     current_square = square

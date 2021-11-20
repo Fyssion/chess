@@ -1,4 +1,6 @@
 class Square:
+    """A square on the board."""
+
     __slots__ = ('row', 'column')
 
     FILES = ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')

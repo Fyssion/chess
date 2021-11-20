@@ -1,4 +1,3 @@
-from platform import version
 from typing import Optional
 
 from . import errors
@@ -8,6 +7,15 @@ from .square import Square
 
 
 class CastleState:
+    """The castle state of the board.
+
+    This is internally stored as four bits similar to FEN.
+
+    Examples:
+    1111 -> KQkq
+    1010 -> Kk
+    """
+
     def __init__(self, id: int = 0):
         self.id = id
 
@@ -51,6 +59,11 @@ class CastleState:
 
 
 class Board:
+    """A chess board.
+
+    Internally, the board is represented as a 2D list.
+    """
+
     __slots__ = (
         'rows',
         'active_color',
@@ -85,12 +98,19 @@ class Board:
         self.halfmoves = 0
         self.move_history = []
 
+    def __repr__(self) -> str:
+        return f'<Board fen={self.fen}>'
+
     @classmethod
     def default(cls):
+        """Returns the default board layout."""
+
         return cls.from_fen(cls.DEFAULT_FEN)
 
     @classmethod
     def from_fen(cls, fen: str):
+        """Parses a FEN string into a board."""
+
         self = cls()
 
         (
@@ -161,6 +181,8 @@ class Board:
 
     @property
     def fen(self) -> str:
+        """Returns a FEN string of the board."""
+
         result = ''
 
         # piece placement
@@ -212,9 +234,16 @@ class Board:
         return result
 
     def get(self, square: Square):
+        """Returns the piece on a Square, if any."""
+
         return self.rows[square.row][square.column]
 
     def is_in_check(self, color: int = None) -> bool:
+        """Returns whether or not a color is in check.
+
+        The color defaults to the active color.
+        """
+
         if color is None:
             color = self.active_color
 
@@ -235,12 +264,16 @@ class Board:
         return False
 
     def is_checkmate(self) -> bool:
+        """Returns whether the board is a checkmate."""
+
         if self.is_in_check() and not list(self.legal_moves()):
             return True
 
         return False
 
     def is_stalemate(self) -> bool:
+        """Returns whether the board is a stalemate."""
+
         if self.halfmoves >= 100:
             return True
 
@@ -250,6 +283,8 @@ class Board:
         return False
 
     def pseudo_legal_moves(self):
+        """Returns a generator of all pseudo-legal moves on the board."""
+
         for i, row in enumerate(self.rows):
             for j, piece in enumerate(row):
                 if not piece:
@@ -263,6 +298,8 @@ class Board:
                     yield Move(square, move, capture=capture)
 
     def legal_moves(self):
+        """Returns a generator of all legal moves on the board."""
+
         is_in_check = self.is_in_check()
         active_color = self.active_color
 
@@ -283,6 +320,8 @@ class Board:
                 yield move
 
     def make_move(self, move: Move):
+        """Updates the internal board state to reflect a move."""
+
         piece = self.rows[move.from_square.row][move.from_square.column]
         self.rows[move.from_square.row][move.from_square.column] = None
         self.rows[move.to_square.row][move.to_square.column] = piece
@@ -295,6 +334,8 @@ class Board:
         self.active_color = PieceColor.BLACK if self.active_color else PieceColor.WHITE
 
     def unmake_move(self, move: Move):
+        """Updates the internal board state to reflect a move being unmade."""
+
         piece = self.rows[move.to_square.row][move.to_square.column]
         self.rows[move.to_square.row][move.to_square.column] = move.capture
         self.rows[move.from_square.row][move.from_square.column] = piece
@@ -308,6 +349,8 @@ class Board:
         self.active_color = PieceColor.BLACK if self.active_color else PieceColor.WHITE
 
     def parse_san(self, san: str) -> Move:
+        """Parses a string in Standard Algebraic Notation and returns the Move."""
+
         piece: Optional[Piece] = None
         from_row: Optional[int] = None
         from_column: Optional[int] = None
@@ -374,9 +417,8 @@ class Board:
         return possible_moves[0]
 
     def push_san(self, san: str):
+        """Pushes a inputted move to the board in Standard Algebraic Notation."""
+
         move = self.parse_san(san)
         self.make_move(move)
         return move
-
-    def __repr__(self) -> str:
-        return f'<Board fen={self.fen}>'

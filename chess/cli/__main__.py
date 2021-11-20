@@ -14,38 +14,6 @@ from .board import Board
 console = Console()
 
 
-def prompt(message: str) -> Optional[str]:
-    return console.input(f'{message}\n> ')
-
-
-WHITE_PRETTY_PIECES = {'R': '♜', 'N': '♞', 'B': '♝', 'Q': '♛', 'K': '♚', 'P': '♟'}
-BLACK_PRETTY_PIECES = {'r': '♖', 'n': '♘', 'b': '♗', 'q': '♕', 'k': '♔', 'p': '♙'}
-
-
-def display_board(board: chess.Board):
-    result = ''
-
-    for i, row in enumerate(reversed(board.rows)):
-        result += f'{8 - i} '
-        for piece in row:
-            if not piece:
-                char = '·'
-            else:
-                if piece.color == PieceColor.WHITE:
-                    char = f'[cyan]{self.WHITE_PRETTY_PIECES[piece.fen]}[/]'
-                else:
-                    char = f'[orange]{self.BLACK_PRETTY_PIECES[piece.fen]}[/]'
-
-            result += char + ' '
-        if i + 1 != len(board.rows):
-            result += '\n'
-
-    turn = 'White' if board.active_color == PieceColor.WHITE else 'Black'
-    console.print(Markdown(f"**It's {turn}'s turn!** | Move {board.fullmoves}"))
-    console.print(result)
-    console.print('  ' + ' '.join(chess.Square.FILES))
-
-
 def main():
     fen = Prompt.ask('Please input a FEN string or press enter to begin')
     if not fen:
