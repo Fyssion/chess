@@ -499,7 +499,6 @@ class Board:
                     (remaining_len == 2 and san[i + 2] in promotion_pieces)
                     or (remaining_len == 3 and san[i + 2] == '=' and san[i + 3] in promotion_pieces)
                 )
-                print(i, char, remaining_len, is_promotion)
                 if remaining_len == 1 or is_promotion:
                     # we are at the final square's file
                     to_square = Square(int(san[i + 1]) - 1, Square.FILES.index(char))
