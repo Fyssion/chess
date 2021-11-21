@@ -17,7 +17,7 @@ class Board:
         'rows',
         'active_color',
         'castle_state',
-        'en_passant_state',
+        'en_passant_square',
         'fullmoves',
         'halfmoves',
         'move_history'
@@ -28,7 +28,7 @@ class Board:
     rows: list[list[Optional[Piece]]]
     active_color: int
     castle_state: CastleState
-    en_passant_state: Optional[Square]
+    en_passant_square: Optional[Square]
     fullmoves: int
     halfmoves: int
     move_history: list[Move]
@@ -42,7 +42,7 @@ class Board:
 
         self.active_color = PieceColor.WHITE
         self.castle_state = CastleState()
-        self.en_passant_state = None
+        self.en_passant_square = None
         self.fullmoves = 1
         self.halfmoves = 0
         self.move_history = []
@@ -71,7 +71,7 @@ class Board:
             piece_placement,
             active_color,
             castle_state,
-            en_passant_state,
+            en_passant_square,
             halfmoves,
             fullmoves
         ) = split_fen
@@ -111,8 +111,16 @@ class Board:
         self.castle_state = CastleState.from_fen(castle_state)
 
         # en passant state
-        if en_passant_state != '-':
-            self.en_passant_state = Square.from_san(en_passant_state)
+        if en_passant_square != '-':
+            self.en_passant_square = Square.from_san(en_passant_square)
+
+            # bugfix for lost en passant move
+            up_or_down = 1 if self.active_color is PieceColor.WHITE else -1
+            from_square_row = self.en_passant_square.row + up_or_down
+            from_square = Square(from_square_row, self.en_passant_square.column)
+            to_square_row = self.en_passant_square.row - up_or_down
+            to_square = Square(to_square_row, self.en_passant_square.column)
+            self.move_history.append(Move(from_square, to_square, self.castle_state, en_passant=from_square))
 
         # set halfmoves and fullmoves
         try:
@@ -171,8 +179,8 @@ class Board:
         result += ' '
 
         # en passant state
-        if self.en_passant_state:
-            result += self.en_passant_state.san
+        if self.en_passant_square:
+            result += self.en_passant_square.san
         else:
             result += '-'
 
@@ -283,7 +291,16 @@ class Board:
                 square = Square(i, j)
                 for move in piece.moves(self, square):
                     capture = self.get(move)
-                    yield Move(square, move, capture=capture, castle_state=self.castle_state.copy())
+
+                    if piece.type == PieceType.PAWN and move == self.en_passant_square:
+                        up_or_down = -1 if piece.color is PieceColor.WHITE else 1
+                        original_piece_row = self.en_passant_square.row + up_or_down
+                        en_passant = Square(original_piece_row, move.column)
+                        capture = self.get(en_passant)
+                    else:
+                        en_passant = None
+
+                    yield Move(square, move, capture=capture, castle_state=self.castle_state.copy(), en_passant=en_passant)
 
         # castle moves
         if self.is_in_check():
@@ -320,6 +337,17 @@ class Board:
             if valid:
                 yield move
 
+    def _is_double_pawn_push(self, piece: Optional[Piece], move: Move) -> bool:
+        """Returns whether or not a move is a double pawn push."""
+
+        if piece and piece.type != PieceType.PAWN:
+            return False
+
+        if abs(move.from_square.row - move.to_square.row) == 2:
+            return True
+
+        return False
+
     def make_move(self, move: Move):
         """Updates the internal board state to reflect a move.
 
@@ -349,13 +377,22 @@ class Board:
             self.rows[move.from_square.row][move.from_square.column] = None
             self.rows[move.to_square.row][move.to_square.column] = piece
 
+            if move.en_passant:
+                self.rows[move.en_passant.row][move.en_passant.column] = None
+
         self.move_history.append(move)
 
         if self.active_color is PieceColor.BLACK:
             self.fullmoves += 1
 
-        # castling
+        # en passant
+        if not isinstance(move, CastleMove) and self._is_double_pawn_push(piece, move):
+            en_passant_row = (move.from_square.row + move.to_square.row) // 2
+            self.en_passant_square = Square(en_passant_row, move.from_square.column)
+        else:
+            self.en_passant_square = None
 
+        # castling
         if isinstance(move, CastleMove) or (piece and piece.type == PieceType.KING):
             change = 0b0011 if self.active_color == PieceColor.WHITE else 0b1100
             self.castle_state.id &= change
@@ -392,7 +429,6 @@ class Board:
             rook_from_square = move.rook_from_square(color)
             rook_to_square = move.rook_to_square(color)
 
-
             piece = self.get(king_to_square)
             self.rows[king_to_square.row][king_to_square.column] = None
             self.rows[king_from_square.row][king_from_square.column] = piece
@@ -405,6 +441,22 @@ class Board:
             piece = self.rows[move.to_square.row][move.to_square.column]
             self.rows[move.to_square.row][move.to_square.column] = move.capture
             self.rows[move.from_square.row][move.from_square.column] = piece
+
+            if move.en_passant:
+                self.rows[move.en_passant.row][move.en_passant.column] = move.capture
+                self.rows[move.to_square.row][move.to_square.column] = None
+
+        # en passant
+        if len(self.move_history) >= 2:
+            last_move = self.move_history[-2]
+            last_move_piece = self.get(last_move.to_square)
+            if not isinstance(last_move, CastleMove) and self._is_double_pawn_push(last_move_piece, last_move):
+                en_passant_row = (last_move.from_square.row + last_move.to_square.row) // 2
+                self.en_passant_square = Square(en_passant_row, last_move.from_square.column)
+            else:
+                self.en_passant_square = None
+        else:
+            self.en_passant_square = None
 
         if self.move_history[-1] == move:
             self.move_history.pop(-1)

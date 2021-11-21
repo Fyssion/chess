@@ -13,18 +13,28 @@ class CastleType:
 class Move:
     """A move being made on the board."""
 
-    __slots__ = ('from_square', 'to_square', 'capture', 'castle', 'castle_state')
+    __slots__ = ('from_square', 'to_square', 'capture', 'en_passant', 'castle', 'castle_state')
 
     from_square: Square
     to_square: Square
     capture: Optional[Piece]
+    en_passant: Optional[Square]
     castle: Optional[int]
     castle_state: CastleState
 
-    def __init__(self, from_square: Square, to_square: Square, castle_state: CastleState, capture: Piece = None, castle: int = None):
+    def __init__(
+            self,
+            from_square: Square,
+            to_square: Square,
+            castle_state: CastleState,
+            capture: Piece = None,
+            en_passant: Square = None,
+            castle: int = None
+    ):
         self.from_square = from_square
         self.to_square = to_square
         self.capture = capture
+        self.en_passant = en_passant
         self.castle = castle
         self.castle_state = castle_state
 
@@ -34,7 +44,9 @@ class Move:
             and self.from_square == other.from_square
             and self.to_square == other.to_square
             and self.capture == other.capture
+            and self.en_passant == other.en_passant
             and self.castle == other.castle
+            and self.castle_state == other.castle_state
         )
 
     def __repr__(self) -> str:

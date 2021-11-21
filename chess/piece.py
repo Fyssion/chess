@@ -161,6 +161,10 @@ class Pawn(Piece):
                 if piece.color != piece_to_check.color:
                     yield square_to_check
 
+            # also check for en passant
+            if board.en_passant_square == square_to_check:
+                yield square_to_check
+
 
 class Rook(Piece):
     TYPE = PieceType.ROOK
