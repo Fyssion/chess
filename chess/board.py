@@ -492,20 +492,24 @@ class Board:
                 continue
 
             if char in Square.FILES:
-                # we are either at the final square's file or the first square's file
-                if 1 <= len(char) - i + 1 <= 2:
+                # we are either at the final square's file or the first square's file'
+                remaining_len = len(san) - i - 1
+                promotion_pieces = ('Q', 'R', 'B', 'N')
+                is_promotion = (
+                    (remaining_len == 2 and san[i + 2] in promotion_pieces)
+                    or (remaining_len == 3 and san[i + 2] == '=' and san[i + 3] in promotion_pieces)
+                )
+                print(i, char, remaining_len, is_promotion)
+                if remaining_len == 1 or is_promotion:
                     # we are at the final square's file
                     to_square = Square(int(san[i + 1]) - 1, Square.FILES.index(char))
+                    # TODO: promotion
                     break
                 else:
                     # we are at the first square's file
                     # the next char could be a rank
                     from_column = Square.FILES.index(char)
-                    try:
-                        from_row = int(san[i + 1]) - 1
-                    except ValueError:
-                        # no rank specified
-                        continue
+                    continue
 
             try:
                 from_row = int(char) - 1
