@@ -1,61 +1,10 @@
 from typing import Optional
 
 from . import errors
+from .castle_state import CastleState
 from .move import Move, CastleMove, CastleType
 from .piece import PieceColor, Piece, PIECES, PieceType
 from .square import Square
-
-
-class CastleState:
-    """The castle state of the board.
-
-    This is internally stored as four bits similar to FEN.
-
-    Examples:
-    1111 -> KQkq
-    1010 -> Kk
-    """
-
-    def __init__(self, id: int = 0):
-        self.id = id
-
-    def __repr__(self) -> str:
-        return f'<CastleState fen="{self.fen}">'
-
-    @classmethod
-    def from_fen(cls, fen: str):
-        castle_state = 0
-
-        if fen != '-':
-            for char in fen:
-                if char == 'K':
-                    castle_state |= 0b1000
-                elif char == 'Q':
-                    castle_state |= 0b0100
-                elif char == 'k':
-                    castle_state |= 0b0010
-                elif char == 'q':
-                    castle_state |= 0b0001
-
-        return cls(castle_state)
-
-    @property
-    def fen(self) -> str:
-        fen = ''
-
-        if self.id:
-            if self.id & 0b1000:
-                fen += 'K'
-            if self.id & 0b0100:
-                fen += 'Q'
-            if self.id & 0b0010:
-                fen += 'k'
-            if self.id & 0b0001:
-                fen += 'q'
-        else:
-            fen += '-'
-
-        return fen
 
 
 class Board:
@@ -113,6 +62,11 @@ class Board:
 
         self = cls()
 
+        split_fen = fen.split()
+
+        if len(split_fen) != 6:
+            raise errors.InvalidFEN()
+
         (
             piece_placement,
             active_color,
@@ -120,10 +74,9 @@ class Board:
             en_passant_state,
             halfmoves,
             fullmoves
-        ) = fen.split()
+        ) = split_fen
 
         # parse piece placement
-
         row = 8
         column = 1
 
@@ -147,13 +100,12 @@ class Board:
             column += 1
 
         # set active color
-
         if active_color == 'w':
             self.active_color = PieceColor.WHITE
         elif active_color == 'b':
             self.active_color = PieceColor.BLACK
         else:
-            raise Exception('Invalid FEN provided.')
+            raise errors.InvalidFEN()
 
         # castle state
         self.castle_state = CastleState.from_fen(castle_state)
@@ -282,9 +234,45 @@ class Board:
 
         return False
 
+    def _controls_square(self, color: int, square: Square):
+        """Returns whether or not a Square is controlled by a color."""
+
+        for i, row in enumerate(self.rows):
+            for j, piece in enumerate(row):
+                if not piece:
+                    continue
+                if piece.color != color:
+                    continue
+
+                current_square = Square(i, j)
+                for move in piece.moves(self, current_square):
+                    if move == square:
+                        return True
+
+        return False
+
+    def _check_castle(self, white_squares: tuple[Square, Square], black_squares: tuple[Square, Square]):
+        """Performs part of the castle detection logic."""
+
+        if self.active_color == PieceColor.WHITE:
+            squares_to_check = white_squares
+            color = PieceColor.BLACK
+        else:
+            squares_to_check = black_squares
+            color = PieceColor.WHITE
+
+        can_castle: bool = True
+
+        for square in squares_to_check:
+            if self.get(square) or self._controls_square(color, square):
+                can_castle = False
+
+        return can_castle
+
     def pseudo_legal_moves(self):
         """Returns a generator of all pseudo-legal moves on the board."""
 
+        # regular moves
         for i, row in enumerate(self.rows):
             for j, piece in enumerate(row):
                 if not piece:
@@ -295,19 +283,32 @@ class Board:
                 square = Square(i, j)
                 for move in piece.moves(self, square):
                     capture = self.get(move)
-                    yield Move(square, move, capture=capture)
+                    yield Move(square, move, capture=capture, castle_state=self.castle_state.copy())
 
-    def legal_moves(self):
+        # castle moves
+        if self.is_in_check():
+            return
+
+        if self.castle_state.can_castle_kingside(self.active_color):
+            if self._check_castle(
+                (Square(0, 6), Square(0, 5)),
+                (Square(7, 6), Square(7, 5))
+            ):
+                yield CastleMove(CastleType.KINGSIDE, self.castle_state.copy())
+
+        if self.castle_state.can_castle_queenside(self.active_color):
+            if self._check_castle(
+                (Square(0, 2), Square(0, 3)),
+                (Square(7, 2), Square(7, 3))
+            ):
+                yield CastleMove(CastleType.QUEENSIDE, self.castle_state.copy())
+
+    def legal_moves(self, color: int = None):
         """Returns a generator of all legal moves on the board."""
 
-        is_in_check = self.is_in_check()
         active_color = self.active_color
 
         for move in self.pseudo_legal_moves():
-            if not is_in_check:
-                yield move
-                continue
-
             valid: Optional[bool] = False
 
             # make the move, see if still in check, unmake the move
@@ -320,31 +321,99 @@ class Board:
                 yield move
 
     def make_move(self, move: Move):
-        """Updates the internal board state to reflect a move."""
+        """Updates the internal board state to reflect a move.
 
-        piece = self.rows[move.from_square.row][move.from_square.column]
-        self.rows[move.from_square.row][move.from_square.column] = None
-        self.rows[move.to_square.row][move.to_square.column] = piece
+        This does NOT check if the move is valid.
+        It simply performs a replacement and updates the board's state.
+        """
+
+        if isinstance(move, CastleMove):
+            # this is such a disgusting mess.
+            # I'm so sorry
+
+            king_from_square = move.king_from_square(self.active_color)
+            king_to_square = move.king_to_square(self.active_color)
+            rook_from_square = move.rook_from_square(self.active_color)
+            rook_to_square = move.rook_to_square(self.active_color)
+
+            piece = self.get(king_from_square)
+            self.rows[king_from_square.row][king_from_square.column] = None
+            self.rows[king_to_square.row][king_to_square.column] = piece
+
+            piece = self.get(rook_from_square)
+            self.rows[rook_from_square.row][rook_from_square.column] = None
+            self.rows[rook_to_square.row][rook_to_square.column] = piece
+
+        else:
+            piece = self.get(move.from_square)
+            self.rows[move.from_square.row][move.from_square.column] = None
+            self.rows[move.to_square.row][move.to_square.column] = piece
 
         self.move_history.append(move)
 
         if self.active_color is PieceColor.BLACK:
             self.fullmoves += 1
 
+        # castling
+
+        if isinstance(move, CastleMove) or (piece and piece.type == PieceType.KING):
+            change = 0b0011 if self.active_color == PieceColor.WHITE else 0b1100
+            self.castle_state.id &= change
+
+        elif piece and piece.type == PieceType.ROOK:
+            if self.active_color == PieceColor.WHITE:
+                kingside_square = Square(0, 7)
+                kingside_change = 0b0100
+                queenside_square = Square(0, 0)
+                queenside_change = 0b1000
+            else:
+                kingside_square = Square(7, 7)
+                kingside_change = 0b0001
+                queenside_square = Square(7, 0)
+                queenside_change = 0b0010
+
+            if move.from_square == kingside_square:
+                self.castle_state.id &= kingside_change
+            elif move.from_square == queenside_square:
+                self.castle_state.id &= queenside_change
+
         self.active_color = PieceColor.BLACK if self.active_color else PieceColor.WHITE
 
     def unmake_move(self, move: Move):
         """Updates the internal board state to reflect a move being unmade."""
 
-        piece = self.rows[move.to_square.row][move.to_square.column]
-        self.rows[move.to_square.row][move.to_square.column] = move.capture
-        self.rows[move.from_square.row][move.from_square.column] = piece
+        if isinstance(move, CastleMove):
+            # here we go again.
+            # this is just the code from Board.make_move, but the values are switched
+
+            color = PieceColor.WHITE if self.active_color == PieceColor.BLACK else PieceColor.BLACK
+            king_from_square = move.king_from_square(color)
+            king_to_square = move.king_to_square(color)
+            rook_from_square = move.rook_from_square(color)
+            rook_to_square = move.rook_to_square(color)
+
+
+            piece = self.get(king_to_square)
+            self.rows[king_to_square.row][king_to_square.column] = None
+            self.rows[king_from_square.row][king_from_square.column] = piece
+
+            piece = self.get(rook_to_square)
+            self.rows[rook_to_square.row][rook_to_square.column] = None
+            self.rows[rook_from_square.row][rook_from_square.column] = piece
+
+        else:
+            piece = self.rows[move.to_square.row][move.to_square.column]
+            self.rows[move.to_square.row][move.to_square.column] = move.capture
+            self.rows[move.from_square.row][move.from_square.column] = piece
 
         if self.move_history[-1] == move:
             self.move_history.pop(-1)
 
         if self.active_color is PieceColor.WHITE:
             self.fullmoves -= 1
+
+        # lazy castle state stuff
+        self.castle_state = move.castle_state
 
         self.active_color = PieceColor.BLACK if self.active_color else PieceColor.WHITE
 
@@ -357,10 +426,10 @@ class Board:
         to_square: Optional[Square] = None
 
         if san in ('0-0', 'O-O'):
-            return CastleMove(CastleType.KINGSIDE)
+            return CastleMove(CastleType.KINGSIDE, self.castle_state.copy())
 
         if san in ('0-0-0', 'O-O-O'):
-            return CastleMove(CastleType.QUEENSIDE)
+            return CastleMove(CastleType.QUEENSIDE, self.castle_state.copy())
 
         for i, char in enumerate(san):
             # see if a piece if specified
@@ -399,7 +468,19 @@ class Board:
         legal_moves = list(self.legal_moves())
         possible_moves: list[Move] = []
 
+        could_be_castle: bool = False
+
+        possible_squares = (Square(0, 0), Square(0, 7), Square(7, 0), Square(7, 7))
+        if piece and piece.type == PieceType.KING and to_square in possible_squares:
+            could_be_castle = True
+
         for legal_move in legal_moves:
+            if isinstance(legal_move, CastleMove):
+                if could_be_castle and to_square == legal_move.rook_from_square(self.active_color):
+                    return legal_move
+                else:
+                    continue
+
             if (
                 to_square == legal_move.to_square
                 and (not piece or piece == self.get(legal_move.from_square))
@@ -416,7 +497,7 @@ class Board:
 
         return possible_moves[0]
 
-    def push_san(self, san: str):
+    def push_san(self, san: str) -> Move:
         """Pushes a inputted move to the board in Standard Algebraic Notation."""
 
         move = self.parse_san(san)
