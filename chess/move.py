@@ -100,6 +100,8 @@ class CastleMove(Move):
         self.to_square = None
         self.capture = None
         self.castle = castle
+        self.en_passant = None
+        self.promotion = None
         self.castle_state = castle_state
 
     # the code below this line is an abysmal mess.

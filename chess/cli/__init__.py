@@ -2,12 +2,13 @@ import random
 from typing import Optional
 
 from rich.console import Console
+from rich.progress import Progress
 from rich.prompt import Prompt, Confirm, PromptBase, InvalidResponse
 
 import chess
 from chess.errors import InvalidFEN, InvalidMove, DisambiguationError, PromotionError
 from chess.piece import PieceColor
-from chess.engines import Engine, RandomEngine
+from chess.engines import Engine, OysterEngine
 
 from .board import Board
 
@@ -58,7 +59,7 @@ def main():
             player_color = random.choice((PieceColor.WHITE, PieceColor.BLACK))
 
         # TODO: add engine choosing process
-        engine = RandomEngine()
+        engine = OysterEngine()
 
     should_print: bool = True
 
@@ -78,8 +79,10 @@ def main():
             break
 
         if engine and board.active_color != player_color:
-            console.print('Engine is moving...')
-            board.make_move(engine.get_move(board))
+            with Progress(console=console, transient=True) as progress:
+                progress.add_task("[yellow]Thinking", total=1000, start=False)
+                board.make_move(engine.get_move(board))
+            console.print(f'Evaluated {engine.counter} positions.')
             should_print = True
             continue
 

@@ -25,13 +25,13 @@ class Board:
 
     DEFAULT_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
-    rows: list[list[Optional[Piece]]]
+    rows: 'list[list[Optional[Piece]]]'
     active_color: int
     castle_state: CastleState
     en_passant_square: Optional[Square]
     fullmoves: int
     halfmoves: int
-    move_history: list[Move]
+    move_history: 'list[Move]'
 
     def __init__(self):
         # 8x8 board filled with nothing
@@ -259,7 +259,7 @@ class Board:
 
         return False
 
-    def _check_castle(self, white_squares: tuple[Square, Square], black_squares: tuple[Square, Square]):
+    def _check_castle(self, white_squares: 'tuple[Square, Square]', black_squares: 'tuple[Square, Square]'):
         """Performs part of the castle detection logic."""
 
         if self.active_color == PieceColor.WHITE:
@@ -551,7 +551,7 @@ class Board:
                 continue
 
         legal_moves = list(self.legal_moves())
-        possible_moves: list[Move] = []
+        possible_moves: 'list[Move]' = []
 
         could_be_castle: bool = False
 
