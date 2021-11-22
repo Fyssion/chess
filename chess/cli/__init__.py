@@ -7,7 +7,7 @@ from rich.prompt import Prompt, Confirm, PromptBase, InvalidResponse
 import chess
 from chess.errors import InvalidFEN, InvalidMove, DisambiguationError, PromotionError
 from chess.piece import PieceColor
-from chess.engine import Engine, RandomEngine
+from chess.engines import Engine, RandomEngine
 
 from .board import Board
 
