@@ -1,9 +1,13 @@
+import random
+from typing import Optional
+
 from rich.console import Console
 from rich.prompt import Prompt, Confirm, PromptBase, InvalidResponse
 
 import chess
 from chess.errors import InvalidFEN, InvalidMove, DisambiguationError, PromotionError
 from chess.piece import PieceColor
+from chess.engine import Engine, RandomEngine
 
 from .board import Board
 
@@ -41,6 +45,21 @@ def main():
         else:
             break
 
+    engine: Optional[Engine] = None
+    player_color: Optional[int] = None
+    play_engine = Confirm.ask('Do you want to play against an engine?')
+    if play_engine:
+        white_or_black = Prompt.ask('Please enter your piece color (or r for random)', choices=['w', 'b', 'r'], default='r')
+        if white_or_black == 'w':
+            player_color = PieceColor.WHITE
+        elif white_or_black == 'b':
+            player_color = PieceColor.BLACK
+        else:
+            player_color = random.choice((PieceColor.WHITE, PieceColor.BLACK))
+
+        # TODO: add engine choosing process
+        engine = RandomEngine()
+
     should_print: bool = True
 
     while True:
@@ -57,6 +76,12 @@ def main():
         if board.is_stalemate():
             console.print('Stalemate!')
             break
+
+        if engine and board.active_color != player_color:
+            console.print('Engine is moving...')
+            board.make_move(engine.get_move(board))
+            should_print = True
+            continue
 
         move = Prompt.ask('Please enter a [magenta]move in algebraic notation[/] or a [magenta]command[/]')
 
