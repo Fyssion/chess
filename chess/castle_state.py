@@ -14,6 +14,12 @@ class CastleState:
     def __init__(self, id: int = 0):
         self.id = id
 
+    def __eq__(self, other) -> bool:
+        return (
+            isinstance(other, self.__class__)
+            and self.id == other.id
+        )
+
     def __repr__(self) -> str:
         return f'<CastleState fen="{self.fen}">'
 
