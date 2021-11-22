@@ -13,13 +13,22 @@ class CastleType:
 class Move:
     """A move being made on the board."""
 
-    __slots__ = ('from_square', 'to_square', 'capture', 'en_passant', 'castle', 'castle_state')
+    __slots__ = (
+        'from_square',
+        'to_square',
+        'capture',
+        'en_passant',
+        'castle',
+        'promotion',
+        'castle_state'
+    )
 
     from_square: Square
     to_square: Square
     capture: Optional[Piece]
     en_passant: Optional[Square]
     castle: Optional[int]
+    promotion: Optional[Piece]
     castle_state: CastleState
 
     def __init__(
@@ -29,6 +38,7 @@ class Move:
             castle_state: CastleState,
             capture: Piece = None,
             en_passant: Square = None,
+            promotion: Piece = None,
             castle: int = None
     ):
         self.from_square = from_square
@@ -36,6 +46,7 @@ class Move:
         self.capture = capture
         self.en_passant = en_passant
         self.castle = castle
+        self.promotion = promotion
         self.castle_state = castle_state
 
     def __eq__(self, other) -> bool:
@@ -46,6 +57,7 @@ class Move:
             and self.capture == other.capture
             and self.en_passant == other.en_passant
             and self.castle == other.castle
+            and self.promotion == other.promotion
             and self.castle_state == other.castle_state
         )
 
@@ -67,14 +79,16 @@ class Move:
         if self.castle is not None:
             return self.castle_notation
 
-        return f'{self.from_square.san}-{self.to_square.san}'
+        promotion = self.promotion.fen.upper() if self.promotion else ''
+        return f'{self.from_square.san}-{self.to_square.san}{promotion}'
 
     @property
     def uci(self) -> str:
         if self.castle is not None:
             return self.castle_notation
 
-        return f'{self.from_square.san}{self.to_square.san}'
+        promotion = self.promotion.fen.upper() if self.promotion else ''
+        return f'{self.from_square.san}{self.to_square.san}{promotion}'
 
 
 class CastleMove(Move):

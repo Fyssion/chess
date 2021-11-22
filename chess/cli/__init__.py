@@ -2,7 +2,7 @@ from rich.console import Console
 from rich.prompt import Prompt, Confirm, PromptBase, InvalidResponse
 
 import chess
-from chess.errors import InvalidFEN, InvalidMove, DisambiguationError
+from chess.errors import InvalidFEN, InvalidMove, DisambiguationError, PromotionError
 from chess.piece import PieceColor
 
 from .board import Board
@@ -86,15 +86,25 @@ def main():
             console.print(board.fen)
             continue
 
+        if move.lower() == 'board':
+            should_print = True
+            continue
+
         try:
-            result = board.push_san(move)
+            board.push_san(move)
         except InvalidMove:
             console.print('[prompt.invalid]Please enter a valid move.')
+        except PromotionError:
+            promotion = Prompt.ask('Please enter a piece to promote to', choices=['Q', 'R', 'B', 'N'])
+            console.print(move + promotion)
+            board.push_san(move + promotion)
+            should_print = True
         except DisambiguationError as e:
             move = Prompt.ask(
-                'Could not disambiguate between multiple moves. Please confirm your move',
-                choices=[str(m) for m in e.moves]
+                'Could not disambiguate between multiple moves. Please select a move',
+                choices=[m.uci for m in e.moves]
             )
+            board.push_san(move)
+            should_print = True
         else:
-            console.print(result)
             should_print = True

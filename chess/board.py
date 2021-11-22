@@ -3,7 +3,7 @@ from typing import Optional
 from . import errors
 from .castle_state import CastleState
 from .move import Move, CastleMove, CastleType
-from .piece import PieceColor, Piece, PIECES, PieceType
+from .piece import Pawn, PieceColor, Piece, PIECES, PieceType
 from .square import Square
 
 
@@ -292,6 +292,7 @@ class Board:
                 for move in piece.moves(self, square):
                     capture = self.get(move)
 
+                    # en passant
                     if piece.type == PieceType.PAWN and move == self.en_passant_square:
                         up_or_down = -1 if piece.color is PieceColor.WHITE else 1
                         original_piece_row = self.en_passant_square.row + up_or_down
@@ -300,7 +301,26 @@ class Board:
                     else:
                         en_passant = None
 
-                    yield Move(square, move, capture=capture, castle_state=self.castle_state.copy(), en_passant=en_passant)
+                    # promotion
+                    if piece.type == PieceType.PAWN and move.row in (0, 7):
+                        for piece_type in ('Q', 'R', 'B', 'N'):
+                            new_piece = Piece.from_fen(piece_type, color=self.active_color)
+                            yield Move(
+                                square,
+                                move,
+                                capture=capture,
+                                castle_state=self.castle_state.copy(),
+                                en_passant=en_passant,
+                                promotion=new_piece
+                            )
+                    else:
+                        yield Move(
+                            square,
+                            move,
+                            capture=capture,
+                            castle_state=self.castle_state.copy(),
+                            en_passant=en_passant
+                        )
 
         # castle moves
         if self.is_in_check():
@@ -380,6 +400,9 @@ class Board:
             if move.en_passant:
                 self.rows[move.en_passant.row][move.en_passant.column] = None
 
+            if move.promotion:
+                self.rows[move.to_square.row][move.to_square.column] = move.promotion
+
         self.move_history.append(move)
 
         if self.active_color is PieceColor.BLACK:
@@ -419,11 +442,12 @@ class Board:
     def unmake_move(self, move: Move):
         """Updates the internal board state to reflect a move being unmade."""
 
+        color = PieceColor.WHITE if self.active_color == PieceColor.BLACK else PieceColor.BLACK
+
         if isinstance(move, CastleMove):
             # here we go again.
             # this is just the code from Board.make_move, but the values are switched
 
-            color = PieceColor.WHITE if self.active_color == PieceColor.BLACK else PieceColor.BLACK
             king_from_square = move.king_from_square(color)
             king_to_square = move.king_to_square(color)
             rook_from_square = move.rook_from_square(color)
@@ -446,6 +470,9 @@ class Board:
                 self.rows[move.en_passant.row][move.en_passant.column] = move.capture
                 self.rows[move.to_square.row][move.to_square.column] = None
 
+            if move.promotion:
+                self.rows[move.from_square.row][move.from_square.column] = Pawn(color=color)
+
         # en passant
         if len(self.move_history) >= 2:
             last_move = self.move_history[-2]
@@ -467,7 +494,7 @@ class Board:
         # lazy castle state stuff
         self.castle_state = move.castle_state
 
-        self.active_color = PieceColor.BLACK if self.active_color else PieceColor.WHITE
+        self.active_color = color
 
     def parse_san(self, san: str) -> Move:
         """Parses a string in Standard Algebraic Notation and returns the Move."""
@@ -476,6 +503,7 @@ class Board:
         from_row: Optional[int] = None
         from_column: Optional[int] = None
         to_square: Optional[Square] = None
+        promotion: Optional[Piece] = None
 
         if san in ('0-0', 'O-O'):
             return CastleMove(CastleType.KINGSIDE, self.castle_state.copy())
@@ -502,7 +530,9 @@ class Board:
                 if remaining_len == 1 or is_promotion:
                     # we are at the final square's file
                     to_square = Square(int(san[i + 1]) - 1, Square.FILES.index(char))
-                    # TODO: promotion
+                    if is_promotion:
+                        promotion_char = san[i + 3] if '=' in san else san[i + 2]
+                        promotion = Piece.from_fen(promotion_char, color=self.active_color)
                     break
                 else:
                     # we are at the first square's file
@@ -536,13 +566,27 @@ class Board:
                 else:
                     continue
 
+            legal_move_piece = self.get(legal_move.from_square)
+
             if (
                 to_square == legal_move.to_square
-                and (not piece or piece == self.get(legal_move.from_square))
+                and (not piece or piece == legal_move_piece)
+                and (from_column is None or from_column == legal_move.from_square.column)
+                and (from_row is None or from_row == legal_move.from_square.row)
+                and (promotion is None or promotion == legal_move.promotion)
+            ):
+                possible_moves.append(legal_move)
+
+            # catch if the user doesn't enter a promotion piece
+            if (
+                promotion is None  # no false positives
+                and legal_move.promotion
+                and to_square == legal_move.to_square
+                and (legal_move_piece and legal_move_piece.type == PieceType.PAWN)
                 and (from_column is None or from_column == legal_move.from_square.column)
                 and (from_row is None or from_row == legal_move.from_square.row)
             ):
-                possible_moves.append(legal_move)
+                raise errors.PromotionError()
 
         if not possible_moves:
             raise errors.InvalidMove()
