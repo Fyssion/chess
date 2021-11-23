@@ -92,6 +92,8 @@ class OysterEngine(Engine):
     MATE_UPPER = PIECE_SCORES[PieceType.KING] + 10*PIECE_SCORES[PieceType.QUEEN]
 
     def evaluate(self, board: chess.Board) -> float:
+        self.counter += 1
+
         score: float = 0
 
         # calculate piece scores
@@ -122,8 +124,6 @@ class OysterEngine(Engine):
         return score * who_to_move
 
     def negamax(self, board: chess.Board, depth: int, alpha: float, beta: float) -> float:
-        self.counter += 1
-
         if depth == 0:
             return self.evaluate(board)
 
@@ -132,6 +132,7 @@ class OysterEngine(Engine):
         for move in board.legal_moves():
             board.make_move(move)
             score = -self.negamax(board, depth - 1, alpha, beta)
+            print(self.counter)
             board.unmake_move(move)
 
             if score > best_score:

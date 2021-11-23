@@ -106,6 +106,7 @@ def main():
             if not board.move_history:
                 console.print('[prompt.invalid]No move to undo.')
             else:
+                print(board.move_history[-1].castle_state)
                 board.unmake_move(board.move_history[-1])
             should_print = True
             continue
@@ -119,7 +120,7 @@ def main():
             continue
 
         try:
-            board.push_san(move)
+            print(board.push_san(move).castle_state)
         except InvalidMove:
             console.print('[prompt.invalid]Please enter a valid move.')
         except PromotionError:

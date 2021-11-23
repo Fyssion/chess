@@ -5,6 +5,7 @@ from .castle_state import CastleState
 from .move import Move, CastleMove, CastleType
 from .piece import Pawn, PieceColor, Piece, PIECES, PieceType
 from .square import Square
+from chess import castle_state
 
 
 class Board:
@@ -120,7 +121,7 @@ class Board:
             from_square = Square(from_square_row, self.en_passant_square.column)
             to_square_row = self.en_passant_square.row - up_or_down
             to_square = Square(to_square_row, self.en_passant_square.column)
-            self.move_history.append(Move(from_square, to_square, self.castle_state, en_passant=from_square))
+            self.move_history.append(Move(from_square, to_square, self.castle_state.copy(), en_passant=from_square))
 
         # set halfmoves and fullmoves
         try:
@@ -485,13 +486,16 @@ class Board:
         else:
             self.en_passant_square = None
 
-        if self.move_history[-1] == move:
+        if self.move_history and self.move_history[-1] == move:
             self.move_history.pop(-1)
 
         if self.active_color is PieceColor.WHITE:
             self.fullmoves -= 1
 
         # lazy castle state stuff
+        if self.castle_state != move.castle_state:
+            print(self.castle_state, move.castle_state, move)
+
         self.castle_state = move.castle_state
 
         self.active_color = color
