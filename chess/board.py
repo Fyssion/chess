@@ -477,8 +477,7 @@ class Board:
         # en passant
         if len(self.move_history) >= 2:
             last_move = self.move_history[-2]
-            last_move_piece = self.get(last_move.to_square)
-            if not isinstance(last_move, CastleMove) and self._is_double_pawn_push(last_move_piece, last_move):
+            if not isinstance(last_move, CastleMove) and self._is_double_pawn_push(self.get(last_move.to_square), last_move):
                 en_passant_row = (last_move.from_square.row + last_move.to_square.row) // 2
                 self.en_passant_square = Square(en_passant_row, last_move.from_square.column)
             else:
@@ -493,10 +492,9 @@ class Board:
             self.fullmoves -= 1
 
         # lazy castle state stuff
-        if self.castle_state != move.castle_state:
-            print(self.castle_state, move.castle_state, move)
-
-        self.castle_state = move.castle_state
+        # if self.castle_state != move.castle_state:
+        #     print(self.castle_state, move.castle_state, move)
+        self.castle_state = move.castle_state.copy()
 
         self.active_color = color
 
@@ -509,11 +507,19 @@ class Board:
         to_square: Optional[Square] = None
         promotion: Optional[Piece] = None
 
+        legal_moves = list(self.legal_moves())
+
         if san in ('0-0', 'O-O'):
-            return CastleMove(CastleType.KINGSIDE, self.castle_state.copy())
+            move = CastleMove(CastleType.KINGSIDE, self.castle_state.copy())
+            if move not in legal_moves:
+                raise errors.InvalidMove()
+            return move
 
         if san in ('0-0-0', 'O-O-O'):
-            return CastleMove(CastleType.QUEENSIDE, self.castle_state.copy())
+            move = CastleMove(CastleType.QUEENSIDE, self.castle_state.copy())
+            if move not in legal_moves:
+                raise errors.InvalidMove()
+            return move
 
         for i, char in enumerate(san):
             # see if a piece if specified
@@ -554,7 +560,6 @@ class Board:
                 # piece takes a piece, which we can ignore
                 continue
 
-        legal_moves = list(self.legal_moves())
         possible_moves: 'list[Move]' = []
 
         could_be_castle: bool = False
