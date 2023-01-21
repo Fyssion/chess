@@ -1,4 +1,5 @@
 import random
+import time
 from typing import Optional
 
 from rich.console import Console
@@ -81,8 +82,10 @@ def main():
         if engine and board.active_color != player_color:
             with Progress(console=console, transient=True) as progress:
                 progress.add_task("[yellow]Thinking", total=1000, start=False)
+                start = time.perf_counter()
                 board.make_move(engine.get_move(board))
-            console.print(f'Evaluated {engine.counter} positions.')
+                end = time.perf_counter()
+            console.print(f'Evaluated {engine.moves_evaluated} positions in {end - start:.2f} seconds.')
             should_print = True
             continue
 

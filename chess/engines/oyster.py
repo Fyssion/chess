@@ -77,7 +77,7 @@ class OysterEngine(Engine):
         self.move_table: dict[str, Move] = {}
         self.score_table: dict[Move, float] = {}
 
-        self.counter = 0
+        self.moves_evaluated = 0
 
     PIECE_SCORES = {
         PieceType.KING: 200,
@@ -92,7 +92,7 @@ class OysterEngine(Engine):
     MATE_UPPER = PIECE_SCORES[PieceType.KING] + 10*PIECE_SCORES[PieceType.QUEEN]
 
     def evaluate(self, board: chess.Board) -> float:
-        self.counter += 1
+        self.moves_evaluated += 1
 
         score: float = 0
 
@@ -107,7 +107,7 @@ class OysterEngine(Engine):
                 table = PIECE_SQUARE_TABLES[piece.type]
                 table = list(reversed(table)) if piece.color == PieceColor.WHITE else table
 
-                score += table[i][j]
+                score += table[i][j] * negative
 
         # TODO: doubled, blocked, isolated pawns
 
@@ -132,7 +132,6 @@ class OysterEngine(Engine):
         for move in board.legal_moves():
             board.make_move(move)
             score = -self.negamax(board, depth - 1, alpha, beta)
-            print(self.counter)
             board.unmake_move(move)
 
             if score > best_score:
@@ -164,5 +163,5 @@ class OysterEngine(Engine):
 
     def get_move(self, board: chess.Board):
         self.counter = 0
-        best_move = self.negamax_root(board, depth=2)
+        best_move = self.negamax_root(board, depth=3)
         return best_move
